@@ -1,8 +1,10 @@
+import os
 from argparse import ArgumentParser
 from pathlib import Path
 
 from torch.utils.data import DataLoader
 from pytorch_lightning import Trainer
+from pytorch_lightning.logging import CometLogger
 
 from dataset import WorksitesDataset
 from model import MultiTaskLearner
@@ -35,10 +37,16 @@ def main(_):
     val_dl = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
     test_dl = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False)
 
+    # Comet.ml logging
+    comet_api_key = os.environ.get("COMET_API_KEY")
+    comet_logger = CometLogger(api_key=comet_api_key)
+
     # Instantiate model and train
     dict_args = vars(args)
     model = MultiTaskLearner(**dict_args)
-    trainer = Trainer.from_argparse_args(args)
+    trainer = Trainer.from_argparse_args(
+        args, logger=comet_logger, default_root_dir="logs/"
+    )
     trainer.fit(model, train_dl)
 
 
