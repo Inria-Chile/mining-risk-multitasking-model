@@ -148,6 +148,29 @@ class MultiTaskLearner(LightningModule):
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         return {"val_loss": avg_loss}
 
+    def test_step(self, batch, _):
+        # Unpack batch
+        features = batch["features"]
+        classifier_target = batch["classifier_target"]
+        regressor_target = batch["regressor_target"]
+
+        # Inference
+        classifier_predicted, regressor_predicted = self(features)
+
+        # Calculate loss, ignore loss metrics, and save them
+        loss, _ = self.loss(
+            classifier_predicted,
+            regressor_predicted,
+            classifier_target,
+            regressor_target,
+        )
+
+        return {"test_loss": loss}
+
+    def test_epoch_end(self, outputs):
+        avg_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
+        return {"test_loss": avg_loss}
+
     def configure_optimizers(self):
         return torch.optim.SGD(self.parameters(), lr=self.hparams.learning_rate)
 

@@ -57,36 +57,40 @@ def main(_):
         comet_api_key = os.environ.get("COMET_API_KEY")
         comet_logger = CometLogger(api_key=comet_api_key)
 
-    # Instantiate model and train
+    # Instantiate model, train and test
     dict_args = vars(args)
     model = MultiTaskLearner(**dict_args)
     trainer = Trainer.from_argparse_args(
         args,
+        default_root_dir=args.root_dir,
+        early_stop_callback=False,
+        min_epochs=args.epochs,
+        max_epochs=args.epochs,
         logger=comet_logger if args.comet_logging else None,
-        default_root_dir="logs/",
     )
     trainer.fit(model, train_dataloader=train_dl, val_dataloaders=val_dl)
+    trainer.test(test_dataloaders=test_dl)
 
 
 if __name__ == "__main__":
 
     parser = ArgumentParser()
 
+    # Trainer specific arguments
+    parser = Trainer.add_argparse_args(parser)
+
     # Program specific arguments
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=150)
     parser.add_argument("--dataset_path", type=str, default="./datasets/worksites.csv")
     parser.add_argument("--comet_logging", type=bool, default=False)
     parser.add_argument("--dataloader_workers", type=int, default=8)
+    parser.add_argument("--root_dir", type=str, default="logs/")
 
     # Model specific arguments
     parser = MultiTaskLearner.add_model_specific_args(parser)
 
-    # Trainer specific arguments
-    parser = Trainer.add_argparse_args(parser)
-
     args = parser.parse_args()
-
-    print(args)
+    print(args, end="\n\n")
 
     main(args)
