@@ -1,11 +1,15 @@
+from argparse import ArgumentParser
+
 import torch
 import torch.nn as nn
 from pytorch_lightning.core.lightning import LightningModule
 
 
 class MultiTaskLearner(LightningModule):
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, learning_rate, **kwargs):
         super().__init__()
+
+        self.save_hyperparameters()
 
         self.hidden_fc = nn.Linear(
             in_features=input_size, out_features=hidden_size, bias=True
@@ -122,4 +126,14 @@ class MultiTaskLearner(LightningModule):
         return {"loss": loss}
 
     def configure_optimizers(self):
-        return torch.optim.SGD(self.parameters(), lr=0.0001)
+        return torch.optim.SGD(self.parameters(), lr=self.hparams.learning_rate)
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+
+        parser.add_argument("--learning_rate", type=float, default=0.0001)
+        parser.add_argument("--input_size", type=int, default=24)
+        parser.add_argument("--hidden_size", type=float, default=50)
+
+        return parser
