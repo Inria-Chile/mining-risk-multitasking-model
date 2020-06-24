@@ -162,9 +162,9 @@ class WorksitesDataset(Dataset):
         features = self._features_df.iloc[idx].values
         classifier_target, regressor_target = self._labels_df.iloc[idx]
         return {
-            "features": torch.tensor(features),
-            "classifier_target": torch.tensor(classifier_target > 0, dtype=torch.int64),
-            "regressor_target": torch.tensor(regressor_target),
+            "features": torch.tensor(features, dtype=torch.float),
+            "classifier_target": torch.tensor(classifier_target > 0, dtype=torch.long),
+            "regressor_target": torch.tensor(regressor_target, dtype=torch.float),
         }
 
     def __len__(self):

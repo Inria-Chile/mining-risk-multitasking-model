@@ -33,21 +33,39 @@ def main(_):
     )
 
     # Build dataloaders
-    train_dl = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
-    val_dl = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False)
-    test_dl = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False)
+    train_dl = DataLoader(
+        train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.dataloader_workers,
+    )
+    val_dl = DataLoader(
+        val_ds,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.dataloader_workers,
+    )
+    test_dl = DataLoader(
+        test_ds,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.dataloader_workers,
+    )
 
     # Comet.ml logging
-    comet_api_key = os.environ.get("COMET_API_KEY")
-    comet_logger = CometLogger(api_key=comet_api_key)
+    if args.comet_logging:
+        comet_api_key = os.environ.get("COMET_API_KEY")
+        comet_logger = CometLogger(api_key=comet_api_key)
 
     # Instantiate model and train
     dict_args = vars(args)
     model = MultiTaskLearner(**dict_args)
     trainer = Trainer.from_argparse_args(
-        args, logger=comet_logger, default_root_dir="logs/"
+        args,
+        logger=comet_logger if args.comet_logging else None,
+        default_root_dir="logs/",
     )
-    trainer.fit(model, train_dl)
+    trainer.fit(model, train_dataloader=train_dl, val_dataloaders=val_dl)
 
 
 if __name__ == "__main__":
@@ -58,6 +76,8 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=150)
     parser.add_argument("--dataset_path", type=str, default="./datasets/worksites.csv")
+    parser.add_argument("--comet_logging", type=bool, default=False)
+    parser.add_argument("--dataloader_workers", type=int, default=8)
 
     # Model specific arguments
     parser = MultiTaskLearner.add_model_specific_args(parser)
@@ -66,5 +86,7 @@ if __name__ == "__main__":
     parser = Trainer.add_argparse_args(parser)
 
     args = parser.parse_args()
+
+    print(args)
 
     main(args)

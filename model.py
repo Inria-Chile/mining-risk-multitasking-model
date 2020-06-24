@@ -106,11 +106,11 @@ class MultiTaskLearner(LightningModule):
 
     # PyTorch Lightning methods
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, _):
         # Unpack batch
-        features = batch["features"].float()
-        classifier_target = batch["classifier_target"].long()
-        regressor_target = batch["regressor_target"].float()
+        features = batch["features"]
+        classifier_target = batch["classifier_target"]
+        regressor_target = batch["regressor_target"]
 
         # Inference
         classifier_predicted, regressor_predicted = self(features)
@@ -124,6 +124,29 @@ class MultiTaskLearner(LightningModule):
         )
 
         return {"loss": loss}
+
+    def validation_step(self, batch, _):
+        # Unpack batch
+        features = batch["features"]
+        classifier_target = batch["classifier_target"]
+        regressor_target = batch["regressor_target"]
+
+        # Inference
+        classifier_predicted, regressor_predicted = self(features)
+
+        # Calculate loss, ignore loss metrics, and save them
+        loss, _ = self.loss(
+            classifier_predicted,
+            regressor_predicted,
+            classifier_target,
+            regressor_target,
+        )
+
+        return {"val_loss": loss}
+
+    def validation_epoch_end(self, outputs):
+        avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        return {"val_loss": avg_loss}
 
     def configure_optimizers(self):
         return torch.optim.SGD(self.parameters(), lr=self.hparams.learning_rate)
