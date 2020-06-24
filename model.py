@@ -49,9 +49,8 @@ class MultiTaskLearner(LightningModule):
             - loss_metrics
         """
         positive_classes_count = classification_target.sum().unsqueeze(0).float()
-        negative_classes_count = (
-            torch.tensor(classification_target.size()) - positive_classes_count
-        ).float()
+        num_targets = torch.tensor(classification_target.size()).to(self.device)
+        negative_classes_count = (num_targets - positive_classes_count).float()
         classification_criterion = nn.CrossEntropyLoss(
             weight=torch.cat([positive_classes_count, negative_classes_count], dim=0)
         )
