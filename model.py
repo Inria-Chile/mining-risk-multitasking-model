@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 from pytorch_lightning.core.lightning import LightningModule
 
+from pytorch_lightning.metrics.classification import F1, Precision, Recall
+from pytorch_lightning.metrics.regression import MSE
+
 
 class MultiTaskLearner(LightningModule):
     def __init__(self, input_size, hidden_size, learning_rate, **kwargs):
@@ -11,6 +14,7 @@ class MultiTaskLearner(LightningModule):
 
         self.save_hyperparameters()
 
+        # Layers
         self.hidden_fc = nn.Linear(
             in_features=input_size, out_features=hidden_size, bias=True
         )
@@ -23,6 +27,12 @@ class MultiTaskLearner(LightningModule):
         self.regressor_fc = nn.Linear(
             in_features=hidden_size, out_features=1, bias=True  # It's a regression
         )
+
+        # Metrics
+        self.f1 = F1()
+        self.precision = Precision()
+        self.recall = Recall()
+        self.mse = MSE()
 
     def forward(self, features):
         hidden_features = self.hidden_fc(features)
@@ -78,32 +88,7 @@ class MultiTaskLearner(LightningModule):
             },
         )
 
-    @staticmethod
-    def mask_regressor_tensors(target, predicted):
-        mask = ~torch.isfinite(target)
-        predicted[mask] = 0
-        target[mask] = 0
-        return target, predicted
-
-    @staticmethod
-    def classification_metrics(target, predicted):
-        precision = precision_score(target, predicted)
-        recall = recall_score(target, predicted)
-        f1 = f1_score(target, predicted)
-        return {
-            "precision": precision,
-            "recall": recall,
-            "f1": f1,
-        }
-
-    @staticmethod
-    def regression_metrics(target, predicted):
-        mse = mean_squared_error(target, predicted)
-        return {
-            "mse": mse,
-        }
-
-    # PyTorch Lightning methods
+    # PyTorch Lightning hooks
 
     def _inference(self, batch, _):
         # Unpack batch
@@ -124,29 +109,77 @@ class MultiTaskLearner(LightningModule):
 
         return {
             "loss": loss,
-            "classifier_target_predicted": (classifier_target, classifier_predicted),
-            "regressor_target_predicted": (regressor_target, regressor_predicted),
+            "classifier_tensors": (classifier_target, classifier_predicted),
+            "regressor_tensors": (regressor_target, regressor_predicted),
         }
+
+    def _epoch_end_metrics(self, outputs, prefix=""):
+        # Loss
+        avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
+
+        # Classification metrics
+        classification_targets = torch.cat(
+            [x["classifier_tensors"][0] for x in outputs]
+        )
+        classification_predicted = torch.cat(
+            [x["classifier_tensors"][1] for x in outputs]
+        ).argmax(dim=1)
+        classification_metrics = {
+            f"{prefix}_f1": self.f1(classification_predicted, classification_targets),
+            f"{prefix}_precision": self.precision(
+                classification_predicted, classification_targets
+            ),
+            f"{prefix}_recall": self.recall(
+                classification_predicted, classification_targets
+            ),
+        }
+
+        # Regression metrics
+        regression_targets = torch.cat([x["regressor_tensors"][0] for x in outputs])
+        regression_predicted = torch.cat(
+            [x["regressor_tensors"][1] for x in outputs]
+        ).squeeze()
+        regression_targets, regression_predicted = self._mask_regressor_tensors(
+            regression_targets, regression_predicted
+        )
+
+        regression_metrics = {
+            f"{prefix}_mse": self.mse(regression_targets, regression_predicted)
+        }
+
+        return avg_loss, classification_metrics, regression_metrics
+
+    @staticmethod
+    def _mask_regressor_tensors(target, predicted):
+        mask = ~torch.isfinite(target)
+        predicted[mask] = 0
+        target[mask] = 0
+        return target, predicted
 
     def training_step(self, batch, batch_idx):
         return self._inference(batch, batch_idx)
 
     def training_epoch_end(self, outputs):
-        return {}
+        loss, classifier_metrics, regressor_metrics = self._epoch_end_metrics(outputs)
+        return {"loss": loss, **classifier_metrics, **regressor_metrics}
 
     def validation_step(self, batch, batch_idx):
         return self._inference(batch, batch_idx)
 
     def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
-        return {"val_loss": avg_loss}
+        loss, classifier_metrics, regressor_metrics = self._epoch_end_metrics(
+            outputs, prefix="val"
+        )
+        return {"val_loss": loss, **classifier_metrics, **regressor_metrics}
 
     def test_step(self, batch, batch_idx):
         return self._inference(batch, batch_idx)
 
     def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([x["loss"] for x in outputs]).mean()
-        return {"test_loss": avg_loss}
+        loss, classifier_metrics, regressor_metrics = self._epoch_end_metrics(
+            outputs, prefix="test"
+        )
+        return {"test_loss": loss, **classifier_metrics, **regressor_metrics}
 
     def configure_optimizers(self):
         return torch.optim.SGD(self.parameters(), lr=self.hparams.learning_rate)
