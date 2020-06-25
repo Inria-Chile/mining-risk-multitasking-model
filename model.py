@@ -161,7 +161,7 @@ class MultiTaskLearner(LightningModule):
 
     def training_epoch_end(self, outputs):
         loss, classifier_metrics, regressor_metrics = self._epoch_end_metrics(outputs)
-        return {"loss": loss, **classifier_metrics, **regressor_metrics}
+        return {"loss": loss, "log": {**classifier_metrics, **regressor_metrics}}
 
     def validation_step(self, batch, batch_idx):
         return self._inference(batch, batch_idx)
@@ -170,7 +170,7 @@ class MultiTaskLearner(LightningModule):
         loss, classifier_metrics, regressor_metrics = self._epoch_end_metrics(
             outputs, prefix="val"
         )
-        return {"val_loss": loss, **classifier_metrics, **regressor_metrics}
+        return {"val_loss": loss, "log": {**classifier_metrics, **regressor_metrics}}
 
     def test_step(self, batch, batch_idx):
         return self._inference(batch, batch_idx)
@@ -179,7 +179,7 @@ class MultiTaskLearner(LightningModule):
         loss, classifier_metrics, regressor_metrics = self._epoch_end_metrics(
             outputs, prefix="test"
         )
-        return {"test_loss": loss, **classifier_metrics, **regressor_metrics}
+        return {"test_loss": loss, "log": {**classifier_metrics, **regressor_metrics}}
 
     def configure_optimizers(self):
         return torch.optim.SGD(self.parameters(), lr=self.hparams.learning_rate)
