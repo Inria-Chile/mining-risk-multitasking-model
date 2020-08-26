@@ -12,25 +12,30 @@ from model import MultiTaskLearner
 LABEL_COLUMNS = ["FUTURE_TOTAL_COUNT", "DAYS_UNTIL_NEXT_ACCIDENT"]
 
 
-def main(_):
-    # Build datasets
+def build_datasets(args, label_columns):
     train_ds = WorksitesDataset(
         csv_path=args.dataset_path,
         split=WorksitesDataset.TRAIN,
-        label_columns=LABEL_COLUMNS,
+        label_columns=label_columns,
     )
     val_ds = WorksitesDataset(
         csv_path=args.dataset_path,
         split=WorksitesDataset.VAL,
-        label_columns=LABEL_COLUMNS,
+        label_columns=label_columns,
         feature_scaler=train_ds._feature_scaler,
     )
     test_ds = WorksitesDataset(
         csv_path=args.dataset_path,
         split=WorksitesDataset.TEST,
-        label_columns=LABEL_COLUMNS,
+        label_columns=label_columns,
         feature_scaler=train_ds._feature_scaler,
     )
+    return train_ds, val_ds, test_ds
+
+
+def main(args):
+    # Build datasets
+    train_ds, val_ds, test_ds = build_datasets(args, LABEL_COLUMNS)
 
     # Build dataloaders
     train_dl = DataLoader(
