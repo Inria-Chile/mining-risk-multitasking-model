@@ -15,6 +15,23 @@ class WorksitesDataset(Dataset):
         VAL: 0.1,
         TEST: 0.2,
     }
+    REGIONAL_OFFICES = {
+        1376: "ARICA",
+        1363: "TARAPACA",
+        1364: "ANTOFAGASTA",
+        1365: "ATACAMA",
+        1366: "COQUIMBO",
+        1367: "CENTRO",
+        1374: "CENTRO",
+        1362: "O'HIGGINS",
+        1368: "MAULE",
+        1369: "SUR",
+        1372: "SUR",
+        1371: "SUR",
+        1375: "SUR",
+        1370: "SUR",
+        1373: "MAGALLANES",
+    }
 
     def __init__(
         self, split, label_columns, csv_path, scale_features=True, feature_scaler=None,
@@ -67,6 +84,7 @@ class WorksitesDataset(Dataset):
         split_df = df.iloc[split_idxs[0] : split_idxs[1]].copy()
 
         split_df = self._preprocess_df(split_df)
+
         (
             self._features_df,
             self._labels_df,
@@ -159,13 +177,19 @@ class WorksitesDataset(Dataset):
         return df
 
     def __getitem__(self, idx):
+        record = self._df.iloc[idx]
         features = self._features_df.iloc[idx].values
         classifier_target, regressor_target = self._labels_df.iloc[idx]
+
         return {
             "features": torch.tensor(features, dtype=torch.float),
             "classifier_target": torch.tensor(classifier_target > 0, dtype=torch.long),
             "regressor_target": torch.tensor(regressor_target, dtype=torch.float),
+            "year": record["YEAR"],
+            "month": record["MONTH"],
+            "region": self.REGIONAL_OFFICES[record["REGION_ID"]],
+            "relevance": record["ACCIDENTS_TWELVE_MONTHS"]
         }
-
+    
     def __len__(self):
         return len(self._features_df)
