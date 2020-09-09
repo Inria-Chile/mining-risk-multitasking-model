@@ -13,7 +13,7 @@ import numpy as np
 
 
 class MultiTaskLearner(LightningModule):
-    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, tanh_loss, **kwargs):
+    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, tanh_loss, fill_missing_regression, **kwargs):
         super().__init__()
 
         self.save_hyperparameters()
@@ -102,8 +102,11 @@ class MultiTaskLearner(LightningModule):
 
         if self.hparams.regression_task:
             regression_mask = torch.isnan(regression_target)
-            regression_predicted[regression_mask] = 0
-            regression_target[regression_mask] = 0
+            if self.hparams.fill_missing_regression > 0:
+                regression_target[regression_mask] = self.hparams.fill_missing_regression
+            else:
+                regression_predicted[regression_mask] = 0
+                regression_target[regression_mask] = 0
             regression_criterion = nn.MSELoss()
             regression_loss = regression_criterion(
                 regression_predicted.squeeze(), regression_target
@@ -332,5 +335,6 @@ class MultiTaskLearner(LightningModule):
         parser.add_argument("--input_size", type=int, default=24)
         parser.add_argument("--hidden_size", type=int, default=50)
         parser.add_argument("--tanh_loss", type=bool, default=False)
+        parser.add_argument("--fill_missing_regression", type=int, default=-1)
 
         return parser
