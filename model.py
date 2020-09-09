@@ -245,10 +245,10 @@ class MultiTaskLearner(LightningModule):
 
         if self.hparams.classification_task:
             criticality = torch.cat(
-                [x["classifier_tensors"][0] for x in outputs]
+                [x["classifier_tensors"][1] for x in outputs]
             ).tolist()
         else:
-            criticality = regression_targets = torch.cat([x["regressor_tensors"][0] for x in outputs]).tolist()
+            criticality = regression_targets = torch.cat([x["regressor_tensors"][1] for x in outputs]).tolist()
 
 
         df = pd.DataFrame({
