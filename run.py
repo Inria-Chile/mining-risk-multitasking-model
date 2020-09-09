@@ -3,8 +3,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from torch.utils.data import DataLoader
-from pytorch_lightning import Trainer
-from pytorch_lightning.logging import CometLogger
+from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning.loggers import WandbLogger
 
 from dataset import WorksitesDataset
 from model import MultiTaskLearner
@@ -34,8 +34,14 @@ def build_datasets(args, label_columns):
 
 
 def main(args):
+    # Sanity checks
+    assert args.classification_task or args.regression_task
+
+    seed_everything(42)
+
     # Build datasets
     train_ds, val_ds, test_ds = build_datasets(args, LABEL_COLUMNS)
+    print("Size of train/val/test:", len(train_ds), len(val_ds), len(test_ds), end="\n\n")
 
     # Build dataloaders
     train_dl = DataLoader(
@@ -58,9 +64,11 @@ def main(args):
     )
 
     # Comet.ml logging
-    if args.comet_logging:
-        comet_api_key = os.environ.get("COMET_API_KEY")
-        comet_logger = CometLogger(api_key=comet_api_key)
+    if args.wandb_logging:
+        wandb_logger = WandbLogger(
+            name=args.wandb_name,
+            project="mining"
+        )
 
     # Instantiate model, train and test
     dict_args = vars(args)
@@ -71,10 +79,10 @@ def main(args):
         early_stop_callback=False,
         min_epochs=args.epochs,
         max_epochs=args.epochs,
-        logger=comet_logger if args.comet_logging else None,
+        logger=wandb_logger if args.wandb_logging else None,
     )
     trainer.fit(model, train_dataloader=train_dl, val_dataloaders=val_dl)
-    trainer.test(test_dataloaders=test_dl)
+    trainer.test(test_dataloaders=[test_dl])
 
 
 if __name__ == "__main__":
@@ -88,7 +96,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--dataset_path", type=str, default="./datasets/worksites.csv")
-    parser.add_argument("--comet_logging", type=bool, default=False)
+    parser.add_argument("--wandb_logging", type=bool, default=False)
+    parser.add_argument("--wandb_name", type=str, default="N/A")
     parser.add_argument("--dataloader_workers", type=int, default=8)
     parser.add_argument("--root_dir", type=str, default="logs/")
 
