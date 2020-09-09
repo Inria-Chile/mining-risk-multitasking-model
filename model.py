@@ -13,7 +13,7 @@ import numpy as np
 
 
 class MultiTaskLearner(LightningModule):
-    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, **kwargs):
+    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, tanh_loss, **kwargs):
         super().__init__()
 
         self.save_hyperparameters()
@@ -110,6 +110,10 @@ class MultiTaskLearner(LightningModule):
             )
         else:
             regression_loss = torch.zeros(1).to(self.device)
+        
+        if self.hparams.tanh_loss:
+            classification_loss = torch.tanh(classification_loss)
+            regression_loss = torch.tanh(regression_loss)
 
         loss = classification_loss + regression_loss
 
@@ -327,5 +331,6 @@ class MultiTaskLearner(LightningModule):
         parser.add_argument("--learning_rate", type=float, default=0.0001)
         parser.add_argument("--input_size", type=int, default=24)
         parser.add_argument("--hidden_size", type=int, default=50)
+        parser.add_argument("--tanh_loss", type=bool, default=False)
 
         return parser
