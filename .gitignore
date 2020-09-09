@@ -2,6 +2,7 @@ lightning_logs
 logs
 datasets
 venv*
+wandb/*
 
 #### joe made this: http://goel.io/joe
 
