@@ -15,17 +15,20 @@ LABEL_COLUMNS = ["FUTURE_TOTAL_COUNT", "DAYS_UNTIL_NEXT_ACCIDENT"]
 def build_datasets(args, label_columns):
     train_ds = WorksitesDataset(
         csv_path=args.dataset_path,
+        fill_missing_regression=args.fill_missing_regression,
         split=WorksitesDataset.TRAIN,
         label_columns=label_columns,
     )
     val_ds = WorksitesDataset(
         csv_path=args.dataset_path,
+        fill_missing_regression=args.fill_missing_regression,
         split=WorksitesDataset.VAL,
         label_columns=label_columns,
         feature_scaler=train_ds._feature_scaler,
     )
     test_ds = WorksitesDataset(
         csv_path=args.dataset_path,
+        fill_missing_regression=args.fill_missing_regression,
         split=WorksitesDataset.TEST,
         label_columns=label_columns,
         feature_scaler=train_ds._feature_scaler,
@@ -100,6 +103,7 @@ if __name__ == "__main__":
     parser.add_argument("--wandb_name", type=str, default="N/A")
     parser.add_argument("--dataloader_workers", type=int, default=8)
     parser.add_argument("--root_dir", type=str, default="logs/")
+    parser.add_argument("--fill_missing_regression", type=int, default=-1)
 
     # Model specific arguments
     parser = MultiTaskLearner.add_model_specific_args(parser)

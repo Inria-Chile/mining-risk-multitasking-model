@@ -102,11 +102,8 @@ class MultiTaskLearner(LightningModule):
 
         if self.hparams.regression_task:
             regression_mask = torch.isnan(regression_target)
-            if self.hparams.fill_missing_regression > 0:
-                regression_target[regression_mask] = self.hparams.fill_missing_regression
-            else:
-                regression_predicted[regression_mask] = 0
-                regression_target[regression_mask] = 0
+            regression_predicted[regression_mask] = 0
+            regression_target[regression_mask] = 0
             regression_criterion = nn.MSELoss()
             regression_loss = regression_criterion(
                 regression_predicted.squeeze(), regression_target
@@ -251,7 +248,7 @@ class MultiTaskLearner(LightningModule):
                 [x["classifier_tensors"][1] for x in outputs]
             ).tolist()
         else:
-            criticality = regression_targets = torch.cat([x["regressor_tensors"][1] for x in outputs]).tolist()
+            criticality = torch.cat([x["regressor_tensors"][1] for x in outputs]).tolist()
 
 
         df = pd.DataFrame({
@@ -335,6 +332,5 @@ class MultiTaskLearner(LightningModule):
         parser.add_argument("--input_size", type=int, default=24)
         parser.add_argument("--hidden_size", type=int, default=50)
         parser.add_argument("--tanh_loss", type=bool, default=False)
-        parser.add_argument("--fill_missing_regression", type=int, default=-1)
 
         return parser
