@@ -6,9 +6,10 @@ python run.py \
     --epochs=500 \
     --batch_size=32 \
     --dataset_path=./datasets/worksites.csv \
-    --classification_task=true \
+    --regression_task=true \
+    --fill_missing_regression=3650 \
     --input_size=24 \
     --hidden_size=50 \
     --deterministic=true \
     --wandb_logging=true \
-    --wandb_name=classification-task
+    --wandb_name=regression-filling-missing

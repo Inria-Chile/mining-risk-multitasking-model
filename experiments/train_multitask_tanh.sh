@@ -6,9 +6,12 @@ python run.py \
     --epochs=500 \
     --batch_size=32 \
     --dataset_path=./datasets/worksites.csv \
+    --regression_task=true \
+    --fill_missing_regression=3650 \
     --classification_task=true \
     --input_size=24 \
     --hidden_size=50 \
+    --tanh_loss=true \
     --deterministic=true \
     --wandb_logging=true \
-    --wandb_name=classification-task-faster-ndcg
+    --wandb_name=multitask-tanh

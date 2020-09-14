@@ -2,7 +2,7 @@
 
 python run.py \
     --gpus=1 \
-    --learning_rate=0.0005 \
+    --learning_rate=0.00005 \
     --epochs=500 \
     --batch_size=32 \
     --dataset_path=./datasets/worksites.csv \
