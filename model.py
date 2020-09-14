@@ -8,6 +8,8 @@ from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning.metrics.classification import F1, Precision, Recall
 from pytorch_lightning.metrics.regression import MSE
 
+from sklearn.metrics import ndcg_score
+
 import pandas as pd
 import numpy as np
 
@@ -246,9 +248,9 @@ class MultiTaskLearner(LightningModule):
         if self.hparams.classification_task:
             criticality = torch.cat(
                 [x["classifier_tensors"][1] for x in outputs]
-            ).tolist()
+            ).softmax(dim=1)[:,1].tolist()
         else:
-            criticality = torch.cat([x["regressor_tensors"][1] for x in outputs]).tolist()
+            criticality = (-1 * torch.cat([x["regressor_tensors"][1] for x in outputs]).squeeze()).tolist()
 
 
         df = pd.DataFrame({
@@ -266,8 +268,13 @@ class MultiTaskLearner(LightningModule):
             if group_df["relevance"].sum() == 0:
                 missing += 1
                 continue
-            ranked = group_df.sort_values(by="criticality", ascending=not self.hparams.classification_task)
-            score = self._ndcg(ranked, len(ranked))
+            if len(group_df) > 1:
+                score = ndcg_score(
+                    y_true=[group_df["relevance"]],
+                    y_score=[group_df["criticality"]],
+                )
+            else:
+                score = 1
             region = region_year_month[0]
             ndcgs[region].append(score)
         
@@ -278,43 +285,6 @@ class MultiTaskLearner(LightningModule):
             mean_ndcgs[mean_key] = mean_value
         
         return mean_ndcgs
-
-
-    def _ndcg(self, df, p):
-        """
-        Computes the normalized discounted cumulative gain of a DataFrame, according to some relevance.
-        Ref.: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG
-        Args:
-            - df: a DataFrame
-            - p: last position to include
-            - relevance_column: name of the column with each row's column score
-        Returns:
-            - the normalized discounted cumulative gain
-        """
-        ideal = df.sort_values(by="relevance", ascending=False)
-        num = self._dcg(df, p, "relevance")
-        den = self._dcg(ideal, p, "relevance")
-        return num / den
-
-    
-    @staticmethod
-    def _dcg(df, p, relevance_column):
-        """
-        Computes the discounted cumulative gain of a DataFrame, according to some relevance.
-        Ref.: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Discounted_Cumulative_Gain
-        Args:
-            - df: a DataFrame
-            - p: last position to include
-            - relevance_column: name of the column with each row's column score
-        Returns:
-            - the discounted cumulative gain
-        """
-        def _dcg(args):
-            (i, (_, row)) = args
-            num = row[relevance_column]
-            den = np.log2(i + 2) # First `i` is zero
-            return num / den
-        return sum(map(_dcg, enumerate(df[:p].iterrows())))
 
 
     def configure_optimizers(self):
