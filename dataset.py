@@ -198,3 +198,10 @@ class WorksitesDataset(Dataset):
     
     def __len__(self):
         return len(self._features_df)
+    
+    @property
+    def classifier_weights(self):
+        classifier_targets = self._labels_df.iloc[:,0]
+        positive_count = (classifier_targets > 0).sum()
+        negative_count = len(classifier_targets) - positive_count
+        return 1 / positive_count, 1 / negative_count
