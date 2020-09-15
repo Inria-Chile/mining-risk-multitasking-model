@@ -37,7 +37,7 @@ class MultiTaskLearner(LightningModule):
                 out_features=2,  # It's a binary classification
                 bias=True,
             )
-            self._classifier_loss_weights = self._build_classifier_loss_weigths(classifier_loss_weights)
+            self._build_classifier_loss_weigths(classifier_loss_weights)
 
         if regression_task:
             self.regressor_hidden_fc = nn.Linear(
@@ -59,8 +59,8 @@ class MultiTaskLearner(LightningModule):
     
     def _build_classifier_loss_weigths(self, classes_count):
         normed_count = [1 - (x / sum(classes_count)) for x in classes_count]
-        weights_tensor = torch.tensor(normed_count, dtype=torch.float).to(self.device)
-        return weights_tensor
+        weights_tensor = torch.tensor(normed_count, dtype=torch.float)
+        self.register_buffer("_classifier_loss_weights", weights_tensor)
         
     def forward(self, features):
         hidden_features = self.hidden_fc(features)

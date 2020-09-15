@@ -204,4 +204,4 @@ class WorksitesDataset(Dataset):
         classifier_targets = self._labels_df.iloc[:,0]
         positive_count = (classifier_targets > 0).sum()
         negative_count = len(classifier_targets) - positive_count
-        return 1 / positive_count, 1 / negative_count
+        return negative_count, positive_count
