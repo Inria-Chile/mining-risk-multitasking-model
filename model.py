@@ -3,6 +3,7 @@ from collections import defaultdict
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pytorch_lightning.core.lightning import LightningModule
 
 from pytorch_lightning.metrics.classification import F1, Precision, Recall
@@ -15,7 +16,7 @@ import numpy as np
 
 
 class MultiTaskLearner(LightningModule):
-    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, tanh_loss, fill_missing_regression, **kwargs):
+    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, tanh_loss, fill_missing_regression, classifier_loss_weights=None, **kwargs):
         super().__init__()
 
         self.save_hyperparameters()
@@ -36,6 +37,8 @@ class MultiTaskLearner(LightningModule):
                 out_features=2,  # It's a binary classification
                 bias=True,
             )
+            self._classifier_loss_weights = self._build_classifier_loss_weigths(classifier_loss_weights)
+
         if regression_task:
             self.regressor_hidden_fc = nn.Linear(
                 in_features=hidden_size,
@@ -53,6 +56,11 @@ class MultiTaskLearner(LightningModule):
             self.recall = Recall()
         if regression_task:
             self.mse = MSE()
+    
+    def _build_classifier_loss_weigths(self, classes_count):
+        normed_count = [1 - (x / sum(classes_count)) for x in classes_count]
+        weights_tensor = torch.tensor(normed_count, dtype=torch.float).to(self.device)
+        return weights_tensor
         
     def forward(self, features):
         hidden_features = self.hidden_fc(features)
@@ -90,25 +98,24 @@ class MultiTaskLearner(LightningModule):
             - loss_metrics
         """
         if self.hparams.classification_task:
-            positive_classes_count = classification_target.sum().unsqueeze(0).float()
-            num_targets = torch.tensor(classification_target.size()).to(self.device)
-            negative_classes_count = (num_targets - positive_classes_count).float()
-            classification_criterion = nn.CrossEntropyLoss(
-                weight=torch.cat([positive_classes_count, negative_classes_count], dim=0)
-            )
-            classification_loss = classification_criterion(
-                classification_predicted, classification_target
+            classification_loss = F.cross_entropy(
+                input=classification_predicted,
+                target=classification_target,
+                weight=self._classifier_loss_weights,
+                reduction="mean"
             )
         else:
             classification_loss = torch.zeros(1).to(self.device)
 
         if self.hparams.regression_task:
             regression_mask = torch.isnan(regression_target)
+            regression_predicted = regression_predicted.squeeze()
             regression_predicted[regression_mask] = 0
             regression_target[regression_mask] = 0
-            regression_criterion = nn.MSELoss()
-            regression_loss = regression_criterion(
-                regression_predicted.squeeze(), regression_target
+            regression_loss = F.mse_loss(
+                input=regression_predicted,
+                target=regression_target,
+                reduction="mean"
             )
         else:
             regression_loss = torch.zeros(1).to(self.device)

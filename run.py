@@ -75,7 +75,10 @@ def main(args):
 
     # Instantiate model, train and test
     dict_args = vars(args)
-    model = MultiTaskLearner(**dict_args)
+    model = MultiTaskLearner(
+        classifier_loss_weights=train_ds.classifier_weights,
+        **dict_args
+    )
     trainer = Trainer.from_argparse_args(
         args,
         default_root_dir=args.root_dir,
