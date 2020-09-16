@@ -81,7 +81,7 @@ def main(args):
     )
     trainer = Trainer.from_argparse_args(
         args,
-        default_root_dir=args.root_dir,
+        default_root_dir=f"{args.root_dir}/{args.wandb_name}",
         early_stop_callback=False,
         min_epochs=args.epochs,
         max_epochs=args.epochs,
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--dataset_path", type=str, default="./datasets/worksites.csv")
     parser.add_argument("--wandb_logging", type=bool, default=False)
-    parser.add_argument("--wandb_name", type=str, default="N/A")
+    parser.add_argument("--wandb_name", type=str, default="NA")
     parser.add_argument("--dataloader_workers", type=int, default=8)
     parser.add_argument("--root_dir", type=str, default="logs/")
     parser.add_argument("--fill_missing_regression", type=int, default=-1)
