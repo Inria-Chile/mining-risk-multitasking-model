@@ -16,10 +16,25 @@ import numpy as np
 
 
 class MultiTaskLearner(LightningModule):
-    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, tanh_loss, fill_missing_regression, classifier_loss_weights=None, **kwargs):
+    def __init__(
+        self,
+        regression_task,
+        classification_task,
+        input_size,
+        hidden_size,
+        learning_rate,
+        classifier_lambda,
+        tanh_loss,
+        fill_missing_regression,
+        classifier_loss_weights=None,
+        **kwargs
+    ):
         super().__init__()
 
         self.save_hyperparameters()
+
+        # Sanity checks
+        assert 0 <= classifier_lambda <= 1
 
         # Layers
         self.hidden_fc = nn.Linear(
@@ -124,7 +139,11 @@ class MultiTaskLearner(LightningModule):
             classification_loss = torch.tanh(classification_loss)
             regression_loss = torch.tanh(regression_loss)
 
-        loss = classification_loss + regression_loss
+        if self.hparams.classifier_lambda > 0:
+            lambda_ = self.hparams.classifier_lambda
+            loss = lambda_ * classification_loss + (1 - lambda_) * regression_loss
+        else:
+            loss = classification_loss + regression_loss
 
         return (
             loss,
@@ -306,6 +325,7 @@ class MultiTaskLearner(LightningModule):
         parser.add_argument("--regression_task", type=bool, default=False)
         parser.add_argument("--classification_task", type=bool, default=False)
         parser.add_argument("--learning_rate", type=float, default=0.0001)
+        parser.add_argument("--classifier_lambda", type=float, default=0)
         parser.add_argument("--input_size", type=int, default=24)
         parser.add_argument("--hidden_size", type=int, default=50)
         parser.add_argument("--tanh_loss", type=bool, default=False)
