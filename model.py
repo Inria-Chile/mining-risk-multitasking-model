@@ -3,20 +3,44 @@ from collections import defaultdict
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pytorch_lightning.core.lightning import LightningModule
 
 from pytorch_lightning.metrics.classification import F1, Precision, Recall
 from pytorch_lightning.metrics.regression import MSE
 
+from sklearn.metrics import ndcg_score
+
 import pandas as pd
 import numpy as np
 
+ACTIVATIONS = {
+    "tanh": torch.tanh,
+    "relu": F.relu,
+}
+
 
 class MultiTaskLearner(LightningModule):
-    def __init__(self, regression_task, classification_task, input_size, hidden_size, learning_rate, **kwargs):
+    def __init__(
+        self,
+        regression_task,
+        classification_task,
+        input_size,
+        hidden_size,
+        learning_rate,
+        classifier_lambda,
+        tanh_loss,
+        fill_missing_regression,
+        regressor_activation,
+        classifier_loss_weights=None,
+        **kwargs
+    ):
         super().__init__()
 
         self.save_hyperparameters()
+
+        # Sanity checks
+        assert 0 <= classifier_lambda <= 1
 
         # Layers
         self.hidden_fc = nn.Linear(
@@ -34,6 +58,8 @@ class MultiTaskLearner(LightningModule):
                 out_features=2,  # It's a binary classification
                 bias=True,
             )
+            self._build_classifier_loss_weigths(classifier_loss_weights)
+
         if regression_task:
             self.regressor_hidden_fc = nn.Linear(
                 in_features=hidden_size,
@@ -51,6 +77,11 @@ class MultiTaskLearner(LightningModule):
             self.recall = Recall()
         if regression_task:
             self.mse = MSE()
+    
+    def _build_classifier_loss_weigths(self, classes_count):
+        normed_count = [1 - (x / sum(classes_count)) for x in classes_count]
+        weights_tensor = torch.tensor(normed_count, dtype=torch.float)
+        self.register_buffer("_classifier_loss_weights", weights_tensor)
         
     def forward(self, features):
         hidden_features = self.hidden_fc(features)
@@ -64,7 +95,7 @@ class MultiTaskLearner(LightningModule):
         
         if self.hparams.regression_task:
             regression_hidden = self.regressor_hidden_fc(hidden_features)
-            regression_hidden = torch.tanh(regression_hidden)
+            regression_hidden = ACTIVATIONS[self.hparams.regressor_activation](regression_hidden)
             regression = self.regressor_fc(regression_hidden)
         else:
             regression = None
@@ -88,30 +119,37 @@ class MultiTaskLearner(LightningModule):
             - loss_metrics
         """
         if self.hparams.classification_task:
-            positive_classes_count = classification_target.sum().unsqueeze(0).float()
-            num_targets = torch.tensor(classification_target.size()).to(self.device)
-            negative_classes_count = (num_targets - positive_classes_count).float()
-            classification_criterion = nn.CrossEntropyLoss(
-                weight=torch.cat([positive_classes_count, negative_classes_count], dim=0)
-            )
-            classification_loss = classification_criterion(
-                classification_predicted, classification_target
+            classification_loss = F.cross_entropy(
+                input=classification_predicted,
+                target=classification_target,
+                weight=self._classifier_loss_weights,
+                reduction="mean"
             )
         else:
             classification_loss = torch.zeros(1).to(self.device)
 
         if self.hparams.regression_task:
             regression_mask = torch.isnan(regression_target)
+            regression_predicted = regression_predicted.squeeze()
             regression_predicted[regression_mask] = 0
             regression_target[regression_mask] = 0
-            regression_criterion = nn.MSELoss()
-            regression_loss = regression_criterion(
-                regression_predicted.squeeze(), regression_target
+            regression_loss = F.mse_loss(
+                input=regression_predicted,
+                target=regression_target,
+                reduction="mean"
             )
         else:
             regression_loss = torch.zeros(1).to(self.device)
+        
+        if self.hparams.tanh_loss:
+            classification_loss = torch.tanh(classification_loss)
+            regression_loss = torch.tanh(regression_loss)
 
-        loss = classification_loss + regression_loss
+        if self.hparams.classifier_lambda > 0:
+            lambda_ = self.hparams.classifier_lambda
+            loss = lambda_ * classification_loss + (1 - lambda_) * regression_loss
+        else:
+            loss = classification_loss + regression_loss
 
         return (
             loss,
@@ -241,10 +279,10 @@ class MultiTaskLearner(LightningModule):
 
         if self.hparams.classification_task:
             criticality = torch.cat(
-                [x["classifier_tensors"][0] for x in outputs]
-            ).tolist()
+                [x["classifier_tensors"][1] for x in outputs]
+            ).softmax(dim=1)[:,1].tolist()
         else:
-            criticality = regression_targets = torch.cat([x["regressor_tensors"][0] for x in outputs]).tolist()
+            criticality = (-1 * torch.cat([x["regressor_tensors"][1] for x in outputs]).squeeze()).tolist()
 
 
         df = pd.DataFrame({
@@ -262,8 +300,13 @@ class MultiTaskLearner(LightningModule):
             if group_df["relevance"].sum() == 0:
                 missing += 1
                 continue
-            ranked = group_df.sort_values(by="criticality", ascending=not self.hparams.classification_task)
-            score = self._ndcg(ranked, len(ranked))
+            if len(group_df) > 1:
+                score = ndcg_score(
+                    y_true=[group_df["relevance"]],
+                    y_score=[group_df["criticality"]],
+                )
+            else:
+                score = 1
             region = region_year_month[0]
             ndcgs[region].append(score)
         
@@ -273,44 +316,10 @@ class MultiTaskLearner(LightningModule):
             mean_value = np.mean(value)
             mean_ndcgs[mean_key] = mean_value
         
+        mean_ndcg = np.mean(list(mean_ndcgs.values()))
+        mean_ndcgs[f"{prefix}_NDCG"] = mean_ndcg
+        
         return mean_ndcgs
-
-
-    def _ndcg(self, df, p):
-        """
-        Computes the normalized discounted cumulative gain of a DataFrame, according to some relevance.
-        Ref.: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Normalized_DCG
-        Args:
-            - df: a DataFrame
-            - p: last position to include
-            - relevance_column: name of the column with each row's column score
-        Returns:
-            - the normalized discounted cumulative gain
-        """
-        ideal = df.sort_values(by="relevance", ascending=False)
-        num = self._dcg(df, p, "relevance")
-        den = self._dcg(ideal, p, "relevance")
-        return num / den
-
-    
-    @staticmethod
-    def _dcg(df, p, relevance_column):
-        """
-        Computes the discounted cumulative gain of a DataFrame, according to some relevance.
-        Ref.: https://en.wikipedia.org/wiki/Discounted_cumulative_gain#Discounted_Cumulative_Gain
-        Args:
-            - df: a DataFrame
-            - p: last position to include
-            - relevance_column: name of the column with each row's column score
-        Returns:
-            - the discounted cumulative gain
-        """
-        def _dcg(args):
-            (i, (_, row)) = args
-            num = row[relevance_column]
-            den = np.log2(i + 2) # First `i` is zero
-            return num / den
-        return sum(map(_dcg, enumerate(df[:p].iterrows())))
 
 
     def configure_optimizers(self):
@@ -325,7 +334,10 @@ class MultiTaskLearner(LightningModule):
         parser.add_argument("--regression_task", type=bool, default=False)
         parser.add_argument("--classification_task", type=bool, default=False)
         parser.add_argument("--learning_rate", type=float, default=0.0001)
+        parser.add_argument("--classifier_lambda", type=float, default=0)
         parser.add_argument("--input_size", type=int, default=24)
         parser.add_argument("--hidden_size", type=int, default=50)
+        parser.add_argument("--tanh_loss", type=bool, default=False)
+        parser.add_argument("--regressor_activation", type=str, default="tanh")
 
         return parser

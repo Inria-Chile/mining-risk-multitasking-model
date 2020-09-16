@@ -8,8 +8,10 @@ python run.py \
     --dataset_path=./datasets/worksites.csv \
     --regression_task=true \
     --fill_missing_regression=1460 \
+    --classification_task=true \
     --input_size=24 \
     --hidden_size=50 \
     --deterministic=true \
     --wandb_logging=true \
-    --wandb_name=regression-filling-missing
+    --wandb_name=multitask-alpha-0.99 \
+    --classifier_lambda=0.99

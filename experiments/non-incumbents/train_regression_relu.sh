@@ -12,4 +12,5 @@ python run.py \
     --hidden_size=50 \
     --deterministic=true \
     --wandb_logging=true \
-    --wandb_name=regression-filling-missing
+    --wandb_name=regression-relu \
+    --regressor_activation=relu
