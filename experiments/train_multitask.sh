@@ -13,4 +13,5 @@ python run.py \
     --hidden_size=50 \
     --deterministic=true \
     --wandb_logging=true \
-    --wandb_name=multitask
+    --wandb_name=multitask-alpha-0.99 \
+    --classifier_lambda=0.99
