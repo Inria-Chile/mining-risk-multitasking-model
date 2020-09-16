@@ -14,6 +14,11 @@ from sklearn.metrics import ndcg_score
 import pandas as pd
 import numpy as np
 
+ACTIVATIONS = {
+    "tanh": torch.tanh,
+    "relu": F.relu,
+}
+
 
 class MultiTaskLearner(LightningModule):
     def __init__(
@@ -26,6 +31,7 @@ class MultiTaskLearner(LightningModule):
         classifier_lambda,
         tanh_loss,
         fill_missing_regression,
+        regressor_activation,
         classifier_loss_weights=None,
         **kwargs
     ):
@@ -89,7 +95,7 @@ class MultiTaskLearner(LightningModule):
         
         if self.hparams.regression_task:
             regression_hidden = self.regressor_hidden_fc(hidden_features)
-            regression_hidden = torch.tanh(regression_hidden)
+            regression_hidden = ACTIVATIONS[self.hparams.regressor_activation](regression_hidden)
             regression = self.regressor_fc(regression_hidden)
         else:
             regression = None
@@ -310,6 +316,9 @@ class MultiTaskLearner(LightningModule):
             mean_value = np.mean(value)
             mean_ndcgs[mean_key] = mean_value
         
+        mean_ndcg = np.mean(list(mean_ndcgs.values()))
+        mean_ndcgs[f"{prefix}_NDCG"] = mean_ndcg
+        
         return mean_ndcgs
 
 
@@ -329,5 +338,6 @@ class MultiTaskLearner(LightningModule):
         parser.add_argument("--input_size", type=int, default=24)
         parser.add_argument("--hidden_size", type=int, default=50)
         parser.add_argument("--tanh_loss", type=bool, default=False)
+        parser.add_argument("--regressor_activation", type=str, default="tanh")
 
         return parser
