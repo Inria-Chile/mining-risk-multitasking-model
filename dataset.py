@@ -34,7 +34,7 @@ class WorksitesDataset(Dataset):
     }
 
     def __init__(
-        self, split, label_columns, csv_path, scale_features=True, feature_scaler=None,
+        self, split, label_columns, csv_path, fill_missing_regression, scale_features=True, feature_scaler=None,
     ):
         """
         Class constructor.
@@ -48,11 +48,13 @@ class WorksitesDataset(Dataset):
         # Sanity check
         assert split in (self.TRAIN, self.VAL, self.TEST)
 
-        self._csv_path = csv_path
         self._split = split
         self._label_columns = label_columns
-        self._feature_scaler = feature_scaler
+        self._csv_path = csv_path
+        self._fill_missing_regression = fill_missing_regression
         self._scale_features = scale_features
+        self._feature_scaler = feature_scaler
+
         self._df = None
         self._features_df = None
         self._labels_df = None
@@ -181,6 +183,9 @@ class WorksitesDataset(Dataset):
         features = self._features_df.iloc[idx].values
         classifier_target, regressor_target = self._labels_df.iloc[idx]
 
+        if self._fill_missing_regression > -1 and np.isnan(regressor_target):
+            regressor_target = self._fill_missing_regression
+
         return {
             "features": torch.tensor(features, dtype=torch.float),
             "classifier_target": torch.tensor(classifier_target > 0, dtype=torch.long),
@@ -193,3 +198,10 @@ class WorksitesDataset(Dataset):
     
     def __len__(self):
         return len(self._features_df)
+    
+    @property
+    def classifier_weights(self):
+        classifier_targets = self._labels_df.iloc[:,0]
+        positive_count = (classifier_targets > 0).sum()
+        negative_count = len(classifier_targets) - positive_count
+        return negative_count, positive_count

@@ -3,13 +3,15 @@
 python run.py \
     --gpus=1 \
     --learning_rate=0.001 \
-    --epochs=200 \
+    --epochs=500 \
     --batch_size=32 \
     --dataset_path=./datasets/worksites.csv \
     --regression_task=true \
     --fill_missing_regression=1460 \
+    --classification_task=true \
     --input_size=24 \
     --hidden_size=50 \
+    --tanh_loss=true \
     --deterministic=true \
     --wandb_logging=true \
-    --wandb_name=regression-filling-missing
+    --wandb_name=multitask-tanh

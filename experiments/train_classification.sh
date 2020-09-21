@@ -2,8 +2,8 @@
 
 python run.py \
     --gpus=1 \
-    --learning_rate=0.00005 \
-    --epochs=500 \
+    --learning_rate=0.001 \
+    --epochs=200 \
     --batch_size=32 \
     --dataset_path=./datasets/worksites.csv \
     --classification_task=true \
