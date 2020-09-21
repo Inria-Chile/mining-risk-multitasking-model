@@ -3,7 +3,7 @@
 > A multi-task learning approach to train the mining accident risk prediction models.
 
 ![Python 3.x](https://img.shields.io/badge/python-3.x-green.svg)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Inria-Chile/mining-risk-multi-task-model)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Inria-Chile/mining-risk-multitask-model)
 ![CI](https://github.com/Inria-Chile/risotto/workflows/CI/badge.svg)
 [![Inria](https://img.shields.io/badge/Made%20in-Inria-%23e63312)](http://inria.cl)
 [![License: CeCILLv2.1](https://img.shields.io/badge/license-CeCILL--v2.1-orange)](https://cecill.info/licences.en.html)
@@ -33,7 +33,7 @@ pip install -r requirements.txt
 ## Citing
 
 ```bibtex
-@techreport{munoz2020:mining-insp-onto
+@techreport{palma2020:mining-accident-risk,
     author = {Palma, Rodolfo and Mart{\'{\i}}, Luis and Sanchez-Pi, Nayat}
     title = {Predicting Accidents in the Mining Industry with a Multi-Task Learning Approach},
     year = {2020},
